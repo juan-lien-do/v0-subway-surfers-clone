@@ -4,9 +4,14 @@ import { Canvas } from "@react-three/fiber"
 import Player from "./Player"
 import { Suspense, useState, useEffect } from "react"
 
-// Game configuration
+function sigmoidScale(score: number, min: number, max: number, midpoint = 500, steepness = 0.01) {
+  const s = 1 / (1 + Math.exp(-steepness * (score - midpoint)))
+  return min + (max - min) * s
+}
+
+// Game configuration with dynamic scaling
 export const GAME_CONFIG = {
-  playerSpeed: 1,
+  playerSpeed: 0.3, // Will scale from 0.3 to 1.0
   laneOffset: 4,
   lanes: {
     left: -4,
@@ -15,23 +20,29 @@ export const GAME_CONFIG = {
   },
   jump: {
     height: 3,
-    duration: 0.5, // seconds
+    duration: 0.9, // Will scale from 0.9 to 0.5 seconds
   },
   obstacles: {
-    spawnInterval: 0.2, // seconds
-    spawnDistance: 50, // distance ahead of player
-    size: [1.5, 2, 1.5], // width, height, depth
+    spawnInterval: 1.0, // Will scale from 1.0 to 0.2 seconds
+    spawnDistance: 50,
+    size: [1.5, 2, 1.5],
   },
   terrain: {
-    segmentSize: 20, // size of each ground segment
-    segmentsAhead: 5, // number of segments to keep ahead of player
-    segmentsBehind: 2, // number of segments to keep behind player
-    recycleDistance: 40, // distance behind player to recycle segments
+    segmentSize: 20,
+    segmentsAhead: 5,
+    segmentsBehind: 2,
+    recycleDistance: 40,
   },
   scoring: {
-    pointsPerSecond: 2, // points gained per second
-    distanceMultiplier: 1, // additional points per unit of distance
+    pointsPerSecond: 2,
+    distanceMultiplier: 1,
   },
+}
+
+export function updateGameDifficulty(score: number) {
+  GAME_CONFIG.playerSpeed = sigmoidScale(score, 0.3, 1.0)
+  GAME_CONFIG.jump.duration = sigmoidScale(score, 0.9, 0.5)
+  GAME_CONFIG.obstacles.spawnInterval = sigmoidScale(score, 1.0, 0.2)
 }
 
 export default function GameScene() {
@@ -61,22 +72,30 @@ export default function GameScene() {
     setScore(0)
     setFinalScore(0)
     setIsPaused(false)
+    GAME_CONFIG.playerSpeed = 0.3
+    GAME_CONFIG.jump.duration = 0.9
+    GAME_CONFIG.obstacles.spawnInterval = 1.0
     window.location.reload()
   }
 
+  useEffect(() => {
+    if (!isGameOver && !isPaused) {
+      updateGameDifficulty(score)
+    }
+  }, [score, isGameOver, isPaused])
+
   return (
     <div className="w-full h-full relative">
-      <Canvas camera={{ position: [0, 5, -10], fov: 75 }} className="w-full h-full" 
-      shadows>
+      <Canvas camera={{ position: [0, 5, -10], fov: 75 }} className="w-full h-full" shadows>
         <Suspense fallback={null}>
           {/* Lighting */}
-          <ambientLight intensity={0.3} />
-          <directionalLight 
-            position={[10, 10, 5]} 
-            intensity={0.5}
+          <ambientLight intensity={1.2} />
+          <directionalLight
+            position={[10, 10, 5]}
+            intensity={0}
             color="#4444ff"
-            castShadow // Habilitar sombras para esta luz
-            shadow-mapSize-width={1024} // Tamaño del mapa de sombras
+            castShadow
+            shadow-mapSize-width={1024}
             shadow-mapSize-height={1024}
             shadow-camera-far={50}
             shadow-camera-left={-20}
@@ -96,6 +115,9 @@ export default function GameScene() {
       {!isGameOver && (
         <div className="absolute top-24 right-4 bg-black/50 text-white px-4 py-2 rounded-lg">
           <div className="text-xl font-bold">Score: {Math.floor(score)}</div>
+          <div className="text-sm opacity-75">Speed: {GAME_CONFIG.playerSpeed.toFixed(2)}</div>
+          <div className="text-sm opacity-75">Jump: {GAME_CONFIG.jump.duration.toFixed(2)}s</div>
+          <div className="text-sm opacity-75">Spawn: {GAME_CONFIG.obstacles.spawnInterval.toFixed(2)}s</div>
         </div>
       )}
 

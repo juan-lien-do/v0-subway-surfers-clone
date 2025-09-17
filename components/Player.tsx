@@ -4,7 +4,7 @@ import { useRef, useEffect, useState } from "react"
 import { useFrame, useThree } from "@react-three/fiber"
 import type { Mesh, Group, SpotLight } from "three"
 import * as THREE from "three"
-import { GAME_CONFIG } from "./GameScene"
+import { GAME_CONFIG, updateGameDifficulty } from "./GameScene"
 
 type Lane = "left" | "center" | "right"
 
@@ -128,6 +128,8 @@ export default function Player({ onGameOver, isGameOver, isPaused, onScoreUpdate
     const distanceScore = totalDistance * GAME_CONFIG.scoring.distanceMultiplier
     const currentScore = timeScore + distanceScore
 
+    updateGameDifficulty(currentScore)
+
     onScoreUpdate(currentScore)
   }, [totalDistance, isGameOver, isPaused, gameStartTime, onScoreUpdate])
 
@@ -231,7 +233,6 @@ export default function Player({ onGameOver, isGameOver, isPaused, onScoreUpdate
   useFrame((state, delta) => {
     if (!meshRef.current || isGameOver || isPaused) return
 
-    // Move forward automatically
     const newZ = positionZ + GAME_CONFIG.playerSpeed
     setPositionZ(newZ)
     setTotalDistance(newZ) // Update total distance for scoring
@@ -295,7 +296,7 @@ export default function Player({ onGameOver, isGameOver, isPaused, onScoreUpdate
   return (
     <>
       {/* Player cube */}
-      <mesh ref={meshRef} position={[0, 0, 0]} castShadow >
+      <mesh ref={meshRef} position={[0, 0, 0]} castShadow>
         <boxGeometry args={[0.8, 0.8, 0.8]} />
         <meshStandardMaterial color="blue" />
       </mesh>
@@ -313,7 +314,7 @@ export default function Player({ onGameOver, isGameOver, isPaused, onScoreUpdate
       />
 
       {obstacles.map((obstacle) => (
-        <mesh key={obstacle.id} position={[obstacle.x, GAME_CONFIG.obstacles.size[1] / 2 - 1, obstacle.z]} castShadow >
+        <mesh key={obstacle.id} position={[obstacle.x, GAME_CONFIG.obstacles.size[1] / 2 - 1, obstacle.z]} castShadow>
           <boxGeometry args={GAME_CONFIG.obstacles.size} />
           <meshStandardMaterial color="red" />
         </mesh>
@@ -322,22 +323,66 @@ export default function Player({ onGameOver, isGameOver, isPaused, onScoreUpdate
       <group ref={terrainRef}>
         {/* Floor segments */}
         {terrainSegments.map((segment) => (
-          <mesh key={segment.id} position={[0, -1, segment.z]} receiveShadow >
+          <mesh key={segment.id} position={[0, -1, segment.z]} receiveShadow>
             <boxGeometry args={[20, 0.2, GAME_CONFIG.terrain.segmentSize]} />
-            <meshStandardMaterial color="gray" />
+            <meshStandardMaterial
+              map={(() => {
+                const canvas = document.createElement("canvas")
+                canvas.width = 64
+                canvas.height = 64
+                const ctx = canvas.getContext("2d")!
+
+                // Create checkered pattern
+                const tileSize = 8
+                for (let x = 0; x < canvas.width; x += tileSize) {
+                  for (let y = 0; y < canvas.height; y += tileSize) {
+                    const isEven = (x / tileSize + y / tileSize) % 2 === 0
+                    ctx.fillStyle = isEven ? "#e8e8e8" : "#d0d0d0"
+                    ctx.fillRect(x, y, tileSize, tileSize)
+                  }
+                }
+
+                const texture = new THREE.CanvasTexture(canvas)
+                texture.wrapS = THREE.RepeatWrapping
+                texture.wrapT = THREE.RepeatWrapping
+                texture.repeat.set(4, 2)
+                return texture
+              })()}
+              roughness={0.8}
+              metalness={0.1}
+            />
           </mesh>
         ))}
 
         {terrainSegments.map((segment) => (
           <group key={`walls-${segment.id}`}>
             {/* Left wall */}
-            <mesh position={[-10, 4, segment.z]} receiveShadow >
+            <mesh position={[-10, 4, segment.z]} receiveShadow>
               <boxGeometry args={[0.5, 10, GAME_CONFIG.terrain.segmentSize]} />
-              <meshStandardMaterial color="#444444" />
+              <meshStandardMaterial color="#F5F5DC" roughness={0.7} metalness={0.0} />
             </mesh>
             {/* Right wall */}
-            <mesh position={[10, 4, segment.z]} receiveShadow >
+            <mesh position={[10, 4, segment.z]} receiveShadow>
               <boxGeometry args={[0.5, 10, GAME_CONFIG.terrain.segmentSize]} />
+              <meshStandardMaterial color="#F5F5DC" roughness={0.7} metalness={0.0} />
+            </mesh>
+          </group>
+        ))}
+
+        {terrainSegments.map((segment) => (
+          <group key={`floor-lines-${segment.id}`}>
+            {/* Center line */}
+            <mesh position={[0, -0.89, segment.z]}>
+              <boxGeometry args={[0.1, 0.02, GAME_CONFIG.terrain.segmentSize]} />
+              <meshStandardMaterial color="#444444" />
+            </mesh>
+            {/* Side lines */}
+            <mesh position={[-6, -0.89, segment.z]}>
+              <boxGeometry args={[0.1, 0.02, GAME_CONFIG.terrain.segmentSize]} />
+              <meshStandardMaterial color="#444444" />
+            </mesh>
+            <mesh position={[6, -0.89, segment.z]}>
+              <boxGeometry args={[0.1, 0.02, GAME_CONFIG.terrain.segmentSize]} />
               <meshStandardMaterial color="#444444" />
             </mesh>
           </group>
@@ -346,7 +391,7 @@ export default function Player({ onGameOver, isGameOver, isPaused, onScoreUpdate
         {terrainSegments.map((segment) => (
           <mesh key={`roof-${segment.id}`} position={[0, 9, segment.z]}>
             <boxGeometry args={[20, 0.5, GAME_CONFIG.terrain.segmentSize]} />
-            <meshStandardMaterial color="#333333" />
+            <meshStandardMaterial color="#F5F5DC" />
           </mesh>
         ))}
 
