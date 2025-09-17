@@ -27,6 +27,12 @@ export const GAME_CONFIG = {
     spawnDistance: 50,
     size: [1.5, 2, 1.5],
   },
+  mate: {
+    size: 0.5,
+    spawnChance: 0.2, // 20% chance when spawning obstacles
+    invulnerabilityDuration: 5000, // 5 seconds in milliseconds
+    height: 3, // Height above obstacles
+  },
   terrain: {
     segmentSize: 20,
     segmentsAhead: 5,
